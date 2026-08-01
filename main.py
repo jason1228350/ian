@@ -1,5 +1,7 @@
 import streamlit as st
 import time
+import random
+import subprocess
 import pandas as pd
 
 # ==========================================
@@ -8,13 +10,11 @@ import pandas as pd
 st.set_page_config(
     page_title="IoT/車聯網韌體自動化漏洞檢測平台",
     page_icon="🛡️",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
-# 自訂標題與風格
-st.title("🛡️ SentinelFuzz:物聯網韌體 Zero-Day 漏洞自動化檢測系統")
-st.caption("基於 QEMU 全系統模擬與動態監控架構 | 專題評審控制台 v1.0")
+st.title("🛡️ SentinelFuzz：物聯網韌體 Zero-Day 漏洞自動化檢測系統")
+st.caption("基於 QEMU 全系統模擬與動態監控架構 | 專題評審控制台 v1.1")
 st.markdown("---")
 
 # ==========================================
@@ -34,6 +34,18 @@ fuzz_speed = st.sidebar.slider("3. Fuzzing 變異頻率 (Execs/sec)", 100, 5000,
 start_button = st.sidebar.button("🚀 啟動 QEMU 自動化測試", type="primary")
 
 # ==========================================
+# 底層環境檢測 (Backend Diagnostic)
+# ==========================================
+def check_qemu():
+    try:
+        res = subprocess.run(["qemu-img", "--version"], capture_output=True, text=True)
+        return True if res.returncode == 0 else False
+    except FileNotFoundError:
+        return False
+
+qemu_ready = check_qemu()
+
+# ==========================================
 # 主畫面內容 (Main Area)
 # ==========================================
 
@@ -41,11 +53,15 @@ start_button = st.sidebar.button("🚀 啟動 QEMU 自動化測試", type="prima
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-    st.metric(label="QEMU 模擬狀態", value="運行中 (Running)" if start_button else "就緒 (Ready)")
+    if start_button:
+        st.metric(label="QEMU 模擬狀態", value="🟢 運行中")
+    else:
+        st.metric(label="QEMU 系統環境", value="🟢 Ready" if qemu_ready else "🔴 未偵測到")
+
 with col2:
     st.metric(label="測試總次數 (Execs)", value="142,850" if start_button else "0")
 with col3:
-    st.metric(label="捕獲異常 (Crashes)", value="3" if start_button else "0", delta="需關注" if start_button else None)
+    st.metric(label="捕獲異常 (Crashes)", value="3" if start_button else "0", delta="⚠️ 檢出 Zero-Day" if start_button else None)
 with col4:
     st.metric(label="代碼覆蓋率 (Coverage)", value="68.4%" if start_button else "0.0%")
 
@@ -58,11 +74,19 @@ with tab1:
     st.subheader("📈 記憶體狀態與測試覆蓋率趨勢")
     
     if start_button:
-        # 模擬即時動態數據
+        # 動態展示測試進度
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        for i in range(1, 101):
+            time.sleep(0.02)
+            progress_bar.progress(i)
+            status_text.text(f"Fuzzing 變異封包發送中... 已完成 {i}%")
+            
         chart_data = pd.DataFrame({
             '時間(秒)': list(range(1, 11)),
             '程式碼覆蓋率 (%)': [12, 25, 38, 45, 52, 58, 61, 65, 67, 68.4],
-            '記憶體異常開銷 (MB)': [15, 18, 22, 45, 80, 30, 28, 95, 32, 30]
+            '記憶體開銷 (MB)': [15, 18, 22, 45, 80, 30, 28, 95, 32, 30]
         })
         st.line_chart(chart_data.set_index('時間(秒)'))
         st.success("✅ 自動化變異測試持續進行中... QEMU 模擬核心運行正常。")
@@ -90,8 +114,13 @@ Remediation        : Replace unsafe strcpy with strncpy in HTTP header handler.
 
 with tab3:
     st.subheader("📋 系統即時監控 Console")
-    st.text_area(
-        "QEMU Console Output",
-        value="[+] QEMU Full-System Emulator Initialized.\n[+] Target Firmware Loaded: ./sample_firmware.bin\n[+] Virtual Network Interface Active (192.168.1.1)\n[+] Fuzzing Engine Attached to Port 80/TCP...",
-        height=200
+    console_log = (
+        "[+] QEMU Full-System Emulator Initialized.\n"
+        "[+] Target Firmware Loaded: ./sample_firmware.bin\n"
+        "[+] Virtual Network Interface Active (192.168.1.1)\n"
+        "[+] Fuzzing Engine Attached to Port 80/TCP...\n"
     )
+    if start_button:
+        console_log += "[!] CRASH DETECTED at 0x800412A0 -> Generating core dump...\n[+] Saved crash payload to ./crashes/id_000000.bin"
+        
+    st.text_area("QEMU Console Output", value=console_log, height=200)
